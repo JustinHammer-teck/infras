@@ -1,0 +1,81 @@
+configs:
+  searxng-ts-serve:
+    content: |
+      {"TCP":{"443":{"HTTPS":true}},
+      "Web":{"$${TS_CERT_DOMAIN}:443":
+          {"Handlers":{"/":
+          {"Proxy":"http://127.0.0.1:8080"}}}},
+      "AllowFunnel":{"$${TS_CERT_DOMAIN}:443":false}}
+
+networks:
+  searxng:
+
+volumes:
+  valkey-data2:
+  searxng-data:
+
+services:
+  searxng-ts:
+    image: tailscale/tailscale:latest
+    container_name: searxng-ts 
+    hostname: searxng
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_SERVE_CONFIG=/config/serve.json
+      - TS_USERSPACE=true
+    configs:
+      - source: searxng-ts-serve
+        target: /config/serve.json
+    cap_add:
+      - net_admin
+      - sys_module
+    volumes:
+      - ${PWD}/tailscale/ts-state:/var/lib/tailscale
+    restart: always 
+
+  searxng-app:
+    container_name: searxng-app
+    image: docker.io/searxng/searxng:latest
+    network_mode: service:searxng-ts
+    depends_on:
+      - searxng-ts
+      - redis
+    restart: unless-stopped
+    volumes:
+      - ${PWD}:/etc/searxng:rw
+      - searxng-data:/var/cache/searxng:rw
+    environment:
+      - UWSGI_WORKERS=${SEARXNG_UWSGI_WORKERS:-4}
+      - UWSGI_THREADS=${SEARXNG_UWSGI_THREADS:-4}        
+      - SEARXNG_BASE_URL=https://searxng.hydra-everest.ts.net    
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  redis:
+    container_name: redis
+    image: docker.io/valkey/valkey:8-alpine
+    command: valkey-server --save 30 1 --loglevel warning
+    restart: unless-stopped
+    volumes:
+      - valkey-data2:/data
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "1"

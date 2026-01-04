@@ -1,0 +1,15 @@
+services:
+  freshrss:
+    image: freshrss/freshrss:latest
+    container_name: freshrss
+    restart: always
+    volumes:
+      - ./data:/var/www/FreshRSS/data
+      - ./extensions:/var/www/FreshRSS/extensions
+    environment:
+      TZ: Australia/Sydney
+      CRON_MIN: '3,33'
+      TRUSTED_PROXY: 192.168.0.1/24
+    logging:
+      options:
+        max-size: 10m

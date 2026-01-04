@@ -1,0 +1,5 @@
+services:
+
+  freshrss:
+    ports:
+      - "${PUBLISHED_PORT:-8081}:${LISTEN:-80}"

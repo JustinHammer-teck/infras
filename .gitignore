@@ -1,0 +1,14 @@
+
+*.img
+*.tar.gz
+
+**/data/
+**/extension/
+**/tailscale/
+
+!composes/**/compose.yml
+!composes/**/docker-compose.yml
+!.gitignore
+!**/*.template
+!justfile
+!flake.*
