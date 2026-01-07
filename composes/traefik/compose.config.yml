@@ -1,0 +1,119 @@
+configs:
+  traefik-ts-serve:
+    content: |
+      {"TCP":{"443":{"HTTPS":true}},
+      "Web":{"$${TS_CERT_DOMAIN}:443":
+          {"Handlers":{"/":
+          {"Proxy":"http://127.0.0.1:443"}}}},
+      "AllowFunnel":{"$${TS_CERT_DOMAIN}:443":false}}
+  traefik-static:
+    context: |
+      # ============================================
+      # Global Settings
+      # ============================================
+      global:
+        checkNewVersion: true
+        sendAnonymousUsage: false
+
+      # ============================================
+      # Logging
+      # ============================================
+      log:
+        level: INFO
+        # level: DEBUG  # Uncomment for troubleshooting
+
+      accessLog:
+        format: json
+
+      # ============================================
+      # API & Dashboard
+      # ============================================
+      api:
+        dashboard: true
+        insecure: false
+
+      # ============================================
+      # EntryPoints
+      # ============================================
+      entryPoints:
+        # HTTP EntryPoint
+        web:
+          address: ":80"
+          http:
+            redirections:
+              entryPoint:
+                to: websecure
+                scheme: https
+                permanent: true
+
+        # HTTPS EntryPoint
+        websecure:
+          address: ":443"
+          http:
+            tls:
+              certResolver: tailscaleresolver
+
+      # ============================================
+      # Certificate Resolvers
+      # ============================================
+      certificatesResolvers:
+        # Tailscale certification
+        tailscaleresolver:
+          tailscale: true
+
+        # Let's Encrypt (ACME) Configuration
+        # letsencrypt:
+        #   acme:
+        #     email: your-email@example.com
+        #     storage: /letsencrypt/acme.json
+        #     httpChallenge:
+        #       entryPoint: web
+        #     # tlsChallenge: {}  # Alternative, doesn't need port 80
+        #     # caServer: https://acme-staging-v02.api.letsencrypt.org/directory  # Staging
+
+      # ============================================
+      # Docker Provider
+      # ============================================
+      providers:
+        docker:
+          exposedByDefault: false
+          network: proxy
+          watch: true
+
+      # ============================================
+      # Metrics (Optional - Prometheus)
+      # ============================================
+      # metrics:
+      #   prometheus:
+      #     buckets:
+      #       - 0.1
+      #       - 0.3
+      #       - 1.2
+      #       - 5.0
+  traefik-dynamic:
+    content: |
+      
+services:
+  traefik-ts:
+    environment:
+      - TS_SERVE_CONFIG=/config/serve.json
+    configs:
+      - source: traefik-ts-serve
+        target: /config/serve.json
+
+  traefik-app:
+    configs:
+      - source: traefik-static
+        target: /etc/traefik/traefik.yaml
+      - source: traefik-dynamic
+        target: /etc/traefik/dynamic/config.yaml
+        profiles:
+          - dynamic
+    environment:
+      - TRAEFIK_DASHBOARD_USER=${TRAEFIK_DASHBOARD_USER:-admin}
+      - TRAEFIK_DASHBOARD_PASSWORD_HASH=${TRAEFIK_DASHBOARD_PASSWORD_HASH}
+    command:
+      - "--providers.file.directory=/etc/traefik/dynamic/"
+      - "--providers.file.watch=true"
+
+

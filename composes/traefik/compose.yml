@@ -1,0 +1,87 @@
+networks:
+  proxy:
+    name: proxy
+    driver: bridge
+    external: true
+
+volumes:
+  traefik-ts-state:
+  traefik-data:
+
+services:
+  traefik-ts:
+    image: tailscale/tailscale:latest
+    container_name: traefik-ts 
+    hostname: proxy
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=true
+    networks:
+      - proxy
+    volumes:
+      - traefik-ts-state:/var/lib/tailscale
+    cap_add:
+      - net_admin
+      - sys_module
+    restart: always 
+
+  traefik-app:
+    image: traefik:v3.4
+    restart: always
+    security_opt:
+      - no-new-privileges:true
+    network_mode: service:traefik-ts
+    ports:
+      - "80:80"
+      - "443:443"
+      # Dashboard port (only expose in development, remove in production)
+      # - "8080:8080"
+    environment:
+      - TRAEFIK_DASHBOARD_USER=${TRAEFIK_DASHBOARD_USER:-admin}
+      - TRAEFIK_DASHBOARD_PASSWORD_HASH=${TRAEFIK_DASHBOARD_PASSWORD_HASH}
+    volumes:
+      # Docker socket (read-only for security)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      # Enable Traefik for this container
+      - "traefik.enable=true"
+
+      # ============================================
+      # Dashboard Router
+      # ============================================
+      # IMPORTANT: Replace 'traefik.yourdomain.com' with your domain
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.hydra-everest.ts.net`)"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.http.routers.dashboard.tls.certresolver=tailscaleresolver"
+
+      # Dashboard Authentication (Basic Auth)
+      # Generate hash with: echo $(htpasswd -nB admin) | sed -e s/\\$/\\$\\$/g
+      # Default: admin:admin (CHANGE THIS!)
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=admin:${}"
+      - "traefik.http.routers.dashboard.middlewares=dashboard-auth@docker"
+
+      # ============================================
+      # Security Headers Middleware (Recommended)
+      # ============================================
+      - "traefik.http.middlewares.security-headers.headers.frameDeny=true"
+      - "traefik.http.middlewares.security-headers.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.security-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.security-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.security-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.security-headers.headers.stsPreload=true"
+    healthcheck:
+      test: traefik healthcheck || exit 1
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 20s
+
+  app1:
+    image: whoami
+    networks:
+      - proxy
+    labels:
+      - "traefik.http.routers.app2.rule=Host(`app1.hydra-everest.ts.net`)"
