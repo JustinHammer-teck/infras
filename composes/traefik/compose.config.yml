@@ -1,13 +1,13 @@
 configs:
   traefik-ts-serve:
     content: |
-      {"TCP":{"443":{"HTTPS":true}},
+      {"TCP":{"443":{"HTTPS":false}},
       "Web":{"$${TS_CERT_DOMAIN}:443":
           {"Handlers":{"/":
-          {"Proxy":"http://127.0.0.1:443"}}}},
+          {"Proxy":"http://127.0.0.1:80"}}}},
       "AllowFunnel":{"$${TS_CERT_DOMAIN}:443":false}}
   traefik-static:
-    context: |
+    content: |
       # ============================================
       # Global Settings
       # ============================================
@@ -49,9 +49,6 @@ configs:
         # HTTPS EntryPoint
         websecure:
           address: ":443"
-          http:
-            tls:
-              certResolver: tailscaleresolver
 
       # ============================================
       # Certificate Resolvers
@@ -62,14 +59,16 @@ configs:
           tailscale: true
 
         # Let's Encrypt (ACME) Configuration
-        # letsencrypt:
-        #   acme:
-        #     email: your-email@example.com
-        #     storage: /letsencrypt/acme.json
-        #     httpChallenge:
-        #       entryPoint: web
-        #     # tlsChallenge: {}  # Alternative, doesn't need port 80
-        #     # caServer: https://acme-staging-v02.api.letsencrypt.org/directory  # Staging
+        letsencrypt:
+          acme:
+            email: eugene@dotnetbistro.cloud
+            storage: /letsencrypt/acme.json
+            dnsChallenge:
+              provider: cloudflare
+              resolvers:
+                - "1.1.1.1:53"
+                - "9.9.9.9:53"
+              delayBeforeCheck: 5
 
       # ============================================
       # Docker Provider
@@ -79,7 +78,8 @@ configs:
           exposedByDefault: false
           network: proxy
           watch: true
-
+      
+      ping: {}
       # ============================================
       # Metrics (Optional - Prometheus)
       # ============================================
@@ -92,7 +92,10 @@ configs:
       #       - 5.0
   traefik-dynamic:
     content: |
-      
+
+volumes:
+  traefik-cert:
+
 services:
   traefik-ts:
     environment:
@@ -105,15 +108,15 @@ services:
     configs:
       - source: traefik-static
         target: /etc/traefik/traefik.yaml
-      - source: traefik-dynamic
-        target: /etc/traefik/dynamic/config.yaml
-        profiles:
-          - dynamic
+      # - source: traefik-dynamic
+      #   target: /etc/traefik/dynamic/config.yaml
     environment:
       - TRAEFIK_DASHBOARD_USER=${TRAEFIK_DASHBOARD_USER:-admin}
       - TRAEFIK_DASHBOARD_PASSWORD_HASH=${TRAEFIK_DASHBOARD_PASSWORD_HASH}
-    command:
-      - "--providers.file.directory=/etc/traefik/dynamic/"
-      - "--providers.file.watch=true"
-
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+    volumes:
+      - traefik-cert:/letsencrypt
+    # command:
+    #   - "--providers.file.directory=/etc/traefik/dynamic/"
+    #   - "--providers.file.watch=true"
 
