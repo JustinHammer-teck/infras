@@ -78,7 +78,10 @@ configs:
           exposedByDefault: false
           network: proxy
           watch: true
-      
+        file:
+          directory: /etc/traefik/dynamic/
+          watch: true
+
       ping: {}
       # ============================================
       # Metrics (Optional - Prometheus)
@@ -90,11 +93,10 @@ configs:
       #       - 0.3
       #       - 1.2
       #       - 5.0
-  traefik-dynamic:
-    content: |
 
 volumes:
   traefik-cert:
+  traefik-config:
 
 services:
   traefik-ts:
@@ -108,7 +110,6 @@ services:
     configs:
       - source: traefik-static
         target: /etc/traefik/traefik.yaml
-      # - source: traefik-dynamic
       #   target: /etc/traefik/dynamic/config.yaml
     environment:
       - TRAEFIK_DASHBOARD_USER=${TRAEFIK_DASHBOARD_USER:-admin}
@@ -116,7 +117,4 @@ services:
       - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
     volumes:
       - traefik-cert:/letsencrypt
-    # command:
-    #   - "--providers.file.directory=/etc/traefik/dynamic/"
-    #   - "--providers.file.watch=true"
-
+      - traefik-config:/etc/traefik/dynamic
