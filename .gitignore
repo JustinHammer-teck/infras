@@ -6,6 +6,8 @@
 **/extension/
 **/tailscale/
 
+**/*/dynamic.yml
+
 !composes/**/compose.yml
 !composes/**/docker-compose.yml
 !.gitignore

@@ -1,0 +1,7 @@
+architecture: x86_64
+creation_date: 1766989571
+properties:
+  description: Flatcar Container Linux
+  os: Flatcar
+  release: "4459.2.2"
+  variant: qemu_uefi

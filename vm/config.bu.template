@@ -1,0 +1,46 @@
+variant: flatcar
+version: 1.1.0
+
+passwd:
+  users:
+    - name: core
+      ssh_authorized_keys:
+        - {{ op://Infrastructure/$FLATCAR_NODE/public key }}
+      groups:
+        - sudo
+        - docker
+storage:
+  files:
+    - path: /etc/hostname
+      mode: 0644
+      contents:
+        inline: $FLATCAR_NODE
+    - path: /etc/ssh/sshd_config.d/custom.conf
+      overwrite: true
+      mode: 0600
+      contents:
+        inline: |
+          HostKey /etc/ssh/ssh_host_ed25519_key
+          HostKey /etc/ssh/ssh_host_rsa_key
+          HostKey /etc/ssh/ssh_host_ecdsa_key
+
+          KexAlgorithms curve25519-sha256@libssh.org,ecdh-sha2-nistp521,ecdh-sha2-nistp384,ecdh-sha2-nistp256,diffie-hellman-group-exchange-sha256
+
+          Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
+
+          MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512,hmac-sha2-256,umac-128@openssh.com
+
+          AuthenticationMethods publickey
+
+          LogLevel VERBOSE
+
+          Subsystem sftp  /usr/lib/ssh/sftp-server -f AUTHPRIV -l INFO
+
+          PermitRootLogin No
+          AllowUsers core
+
+          UsePrivilegeSeparation sandbox
+systemd:
+  units:
+    - name: docker.socket
+      enabled: true
