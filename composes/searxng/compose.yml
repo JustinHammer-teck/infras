@@ -13,11 +13,12 @@ networks:
 volumes:
   valkey-data2:
   searxng-data:
+  searxng-setting:
 
 services:
   searxng-ts:
     image: tailscale/tailscale:latest
-    container_name: searxng-ts 
+    container_name: searxng-ts
     hostname: searxng
     environment:
       - TS_AUTHKEY=${TS_AUTHKEY}
@@ -31,8 +32,8 @@ services:
       - net_admin
       - sys_module
     volumes:
-      - ${PWD}/tailscale/ts-state:/var/lib/tailscale
-    restart: always 
+      - /etc/searxng/tailscale:/var/lib/tailscale
+    restart: always
 
   searxng-app:
     container_name: searxng-app
@@ -41,14 +42,14 @@ services:
     depends_on:
       - searxng-ts
       - redis
-    restart: unless-stopped
+    restart: always
     volumes:
-      - ${PWD}:/etc/searxng:rw
-      - searxng-data:/var/cache/searxng:rw
+      - searxng-setting:/etc/searxng
+      - searxng-data:/var/cache/searxng
     environment:
       - UWSGI_WORKERS=${SEARXNG_UWSGI_WORKERS:-4}
-      - UWSGI_THREADS=${SEARXNG_UWSGI_THREADS:-4}        
-      - SEARXNG_BASE_URL=https://searxng.hydra-everest.ts.net    
+      - UWSGI_THREADS=${SEARXNG_UWSGI_THREADS:-4}
+      - SEARXNG_BASE_URL=https://searxng.hydra-everest.ts.net
     cap_drop:
       - ALL
     cap_add:
@@ -65,7 +66,7 @@ services:
     container_name: redis
     image: docker.io/valkey/valkey:8-alpine
     command: valkey-server --save 30 1 --loglevel warning
-    restart: unless-stopped
+    restart: always
     volumes:
       - valkey-data2:/data
     cap_drop:
